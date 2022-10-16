@@ -1,58 +1,97 @@
 import java.util.List;
+import java.util.Random;
 
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.model.request.ChatAction;
 import com.pengrad.telegrambot.request.GetUpdates;
+import com.pengrad.telegrambot.request.SendAnimation;
 import com.pengrad.telegrambot.request.SendChatAction;
 import com.pengrad.telegrambot.request.SendMessage;
-import com.pengrad.telegrambot.response.BaseResponse;
 import com.pengrad.telegrambot.response.GetUpdatesResponse;
-import com.pengrad.telegrambot.response.SendResponse;
+
+import at.mukprojects.giphy4j.Giphy;
+import at.mukprojects.giphy4j.entity.search.SearchFeed;
+import at.mukprojects.giphy4j.exception.GiphyException;
 
 public class Main {
 
 	public static void main(String[] args) {
 
-		//Criação do objeto bot com as informações de acesso
-		TelegramBot bot = new TelegramBot("5665849374:AAG9LaXkCyQtuQkkO3m-KaMCmCQBqXDYrV8");
+		TelegramBot bot = new TelegramBot("TELEGRAM_API_KEY");
 
-		//objeto responsável por receber as mensagens
 		GetUpdatesResponse updatesResponse;
-		//objeto responsável por gerenciar o envio de respostas
-		SendResponse sendResponse;
-		//objeto responsável por gerenciar o envio de ações do chat
-		BaseResponse baseResponse;
 		
-		//controle de off-set, isto é, a partir deste ID será lido as mensagens pendentes na fila
-		int m=0;
+		List<Update> updatesList;
 		
-		//loop infinito pode ser alterado por algum timer de intervalo curto
-		while (true){
+		String messageReceived;
 		
-			//executa comando no Telegram para obter as mensagens pendentes a partir de um off-set (limite inicial)
-			updatesResponse =  bot.execute(new GetUpdates().limit(100).offset(m));
-			
-			//lista de mensagens
-			List<Update> updates = updatesResponse.updates();
+		Giphy giphy = new Giphy("GIPHY_API_KEY");
+		
+		SearchFeed feed;
+		
+		int numberOfGifs = 10;
+		
+		Random rand = new Random(); 
+		
+		boolean isEmoticon;
+		
+		int offset = 0;
 
-			//análise de cada ação da mensagem
-			for (Update update : updates) {
+		while (true) {
+			
+			updatesResponse =  bot.execute(new GetUpdates().limit(100).offset(offset));
+			
+			updatesList = updatesResponse.updates();
+
+			if (updatesList != null) {
 				
-				//atualização do off-set
-				m = update.updateId()+1;
+				for (Update update : updatesList) {
+					
+					offset = update.updateId()+1;
+					
+					messageReceived = update.message().text();
+					
+					isEmoticon = Character.UnicodeBlock.EMOTICONS.equals(Character.UnicodeBlock.of(messageReceived.codePointAt(0)));
+					
+					if (isEmoticon) {
+						
+						try {
+							
+							feed = giphy.search(messageReceived, numberOfGifs, 0);
+							
+							bot.execute(
+									new SendChatAction(
+											update.message().chat().id(), 
+											ChatAction.typing.name()
+									)
+							);
+							
+							bot.execute(
+									new SendAnimation(
+											update.message().chat().id(), 
+											feed.getDataList().get(rand.nextInt(numberOfGifs)).getImages().getOriginal().getUrl()
+									)
+							);
+						
+						} catch (GiphyException e) {
+							
+							e.printStackTrace();
+							
+						}
+						
+					} else {
+
+						bot.execute(
+								new SendMessage(
+										update.message().chat().id(),
+										"Envie um emote 🙂 para receber um GIF."
+								)
+						);
+					
+					}
 				
-				System.out.println("Recebendo mensagem:"+ update.message().text());
-				
-				//envio de "Escrevendo" antes de enviar a resposta
-				baseResponse = bot.execute(new SendChatAction(update.message().chat().id(), ChatAction.typing.name()));
-				//verificação de ação de chat foi enviada com sucesso
-				System.out.println("Resposta de Chat Action Enviada?" + baseResponse.isOk());
-				
-				//envio da mensagem de resposta
-				sendResponse = bot.execute(new SendMessage(update.message().chat().id(),"Hello world"));
-				//verificação de mensagem enviada com sucesso
-				System.out.println("Mensagem Enviada?" +sendResponse.isOk());
+				}
 				
 			}
 
