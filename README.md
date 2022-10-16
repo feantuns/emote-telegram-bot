@@ -1,4 +1,4 @@
-# JAVA Telegram Bot
+# Emote Telegram Bot
 
 Bot que devolve gifs baseado no emote icon que o usuário envia no telegram.
 
